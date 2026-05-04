@@ -119,6 +119,9 @@ password: admin123
 El sistema es completamente funcional y accesible vía navegador.
 El stock se actualiza automáticamente al registrar ventas.
 El aumento de stock se realiza mediante el botón "+Stock" en productos.
+
 👨‍💻 Autor
+
+ J. Samuel Quispe Mamani
 
 Proyecto desarrollado como trabajo final académico.
