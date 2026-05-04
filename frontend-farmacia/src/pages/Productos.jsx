@@ -5,6 +5,7 @@ export default function Productos() {
   const [productos, setProductos] = useState([]);
   const [busqueda, setBusqueda] = useState("");
   const [editandoId, setEditandoId] = useState(null);
+  const [errores, setErrores] = useState({});
 
   const [form, setForm] = useState({
     codigo_barra: "",
@@ -38,25 +39,78 @@ export default function Productos() {
       fecha_vencimiento: ""
     });
     setEditandoId(null);
+    setErrores({});
+  };
+
+  const validarProducto = () => {
+    const nuevosErrores = {};
+
+    if (!form.nombre.trim()) {
+      nuevosErrores.nombre = "El nombre es obligatorio";
+    }
+
+    if (!form.categoria.trim()) {
+      nuevosErrores.categoria = "La categoría es obligatoria";
+    }
+
+    if (!form.precio) {
+      nuevosErrores.precio = "El precio es obligatorio";
+    } else if (Number(form.precio) <= 0) {
+      nuevosErrores.precio = "El precio debe ser mayor a 0";
+    }
+
+    if (form.stock === "") {
+      nuevosErrores.stock = "El stock es obligatorio";
+    } else if (Number(form.stock) < 0) {
+      nuevosErrores.stock = "El stock no puede ser negativo";
+    }
+
+    if (form.stock_minimo === "") {
+      nuevosErrores.stock_minimo = "El stock mínimo es obligatorio";
+    } else if (Number(form.stock_minimo) < 0) {
+      nuevosErrores.stock_minimo = "El stock mínimo no puede ser negativo";
+    }
+
+    if (form.codigo_barra && !/^\d+$/.test(form.codigo_barra)) {
+      nuevosErrores.codigo_barra = "El código solo debe contener números";
+    }
+
+    setErrores(nuevosErrores);
+    return Object.keys(nuevosErrores).length === 0;
   };
 
   const guardarProducto = async (e) => {
     e.preventDefault();
 
-    if (editandoId) {
-      await api.put(`/productos/${editandoId}`, form);
-      alert("Producto actualizado");
-    } else {
-      await api.post("/productos", form);
-      alert("Producto creado");
-    }
+    if (!validarProducto()) return;
 
-    limpiarForm();
-    cargarProductos();
+    try {
+      const productoData = {
+        ...form,
+        precio: Number(form.precio),
+        stock: Number(form.stock),
+        stock_minimo: Number(form.stock_minimo)
+      };
+
+      if (editandoId) {
+        await api.put(`/productos/${editandoId}`, productoData);
+        alert("Producto actualizado");
+      } else {
+        await api.post("/productos", productoData);
+        alert("Producto creado");
+      }
+
+      limpiarForm();
+      cargarProductos();
+    } catch (error) {
+      console.log(error.response?.data || error);
+      alert(error.response?.data?.message || "Error al guardar producto");
+    }
   };
 
   const editarProducto = (producto) => {
     setEditandoId(producto.id);
+    setErrores({});
 
     setForm({
       codigo_barra: producto.codigo_barra || "",
@@ -83,15 +137,33 @@ export default function Productos() {
   const sumarStock = async (producto) => {
     const cantidad = Number(prompt("Cantidad de stock a agregar:"));
 
-    if (!cantidad || cantidad <= 0) return;
+    if (!cantidad || cantidad <= 0) {
+      alert("Ingrese una cantidad válida mayor a 0");
+      return;
+    }
 
-    await api.put(`/productos/${producto.id}`, {
-      ...producto,
-      stock: Number(producto.stock) + cantidad
-    });
+    const nuevoStock = Number(producto.stock) + cantidad;
 
-    alert("Stock actualizado");
-    cargarProductos();
+    try {
+      await api.put(`/productos/${producto.id}`, {
+        codigo_barra: producto.codigo_barra || "",
+        nombre: producto.nombre || "",
+        descripcion: producto.descripcion || "",
+        categoria: producto.categoria || "",
+        precio: Number(producto.precio),
+        stock: nuevoStock,
+        stock_minimo: Number(producto.stock_minimo),
+        fecha_vencimiento: producto.fecha_vencimiento
+          ? producto.fecha_vencimiento.split("T")[0]
+          : ""
+      });
+
+      alert(`Stock actualizado. Nuevo stock: ${nuevoStock}`);
+      cargarProductos();
+    } catch (error) {
+      console.log(error.response?.data || error);
+      alert(error.response?.data?.message || "Error al actualizar stock");
+    }
   };
 
   const productosFiltrados = productos.filter((p) => {
@@ -123,56 +195,104 @@ export default function Productos() {
         </div>
 
         <form className="product-form" onSubmit={guardarProducto}>
-          <input
-            placeholder="Código de barras"
-            value={form.codigo_barra}
-            onChange={(e) => setForm({ ...form, codigo_barra: e.target.value })}
-          />
+          <div>
+            <input
+              placeholder="Código de barras"
+              value={form.codigo_barra}
+              className={errores.codigo_barra ? "input-error" : ""}
+              onChange={(e) =>
+                setForm({ ...form, codigo_barra: e.target.value })
+              }
+            />
+            {errores.codigo_barra && (
+              <small className="error-text">{errores.codigo_barra}</small>
+            )}
+          </div>
 
-          <input
-            placeholder="Nombre"
-            value={form.nombre}
-            onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-          />
+          <div>
+            <input
+              placeholder="Nombre"
+              value={form.nombre}
+              className={errores.nombre ? "input-error" : ""}
+              onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+            />
+            {errores.nombre && (
+              <small className="error-text">{errores.nombre}</small>
+            )}
+          </div>
 
-          <input
-            placeholder="Descripción"
-            value={form.descripcion}
-            onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
-          />
+          <div>
+            <input
+              placeholder="Descripción"
+              value={form.descripcion}
+              onChange={(e) =>
+                setForm({ ...form, descripcion: e.target.value })
+              }
+            />
+          </div>
 
-          <input
-            placeholder="Categoría"
-            value={form.categoria}
-            onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-          />
+          <div>
+            <input
+              placeholder="Categoría"
+              value={form.categoria}
+              className={errores.categoria ? "input-error" : ""}
+              onChange={(e) => setForm({ ...form, categoria: e.target.value })}
+            />
+            {errores.categoria && (
+              <small className="error-text">{errores.categoria}</small>
+            )}
+          </div>
 
-          <input
-            type="number"
-            placeholder="Precio"
-            value={form.precio}
-            onChange={(e) => setForm({ ...form, precio: e.target.value })}
-          />
+          <div>
+            <input
+              type="number"
+              placeholder="Precio"
+              value={form.precio}
+              className={errores.precio ? "input-error" : ""}
+              onChange={(e) => setForm({ ...form, precio: e.target.value })}
+            />
+            {errores.precio && (
+              <small className="error-text">{errores.precio}</small>
+            )}
+          </div>
 
-          <input
-            type="number"
-            placeholder="Stock"
-            value={form.stock}
-            onChange={(e) => setForm({ ...form, stock: e.target.value })}
-          />
+          <div>
+            <input
+              type="number"
+              placeholder="Stock"
+              value={form.stock}
+              className={errores.stock ? "input-error" : ""}
+              onChange={(e) => setForm({ ...form, stock: e.target.value })}
+            />
+            {errores.stock && (
+              <small className="error-text">{errores.stock}</small>
+            )}
+          </div>
 
-          <input
-            type="number"
-            placeholder="Stock mínimo"
-            value={form.stock_minimo}
-            onChange={(e) => setForm({ ...form, stock_minimo: e.target.value })}
-          />
+          <div>
+            <input
+              type="number"
+              placeholder="Stock mínimo"
+              value={form.stock_minimo}
+              className={errores.stock_minimo ? "input-error" : ""}
+              onChange={(e) =>
+                setForm({ ...form, stock_minimo: e.target.value })
+              }
+            />
+            {errores.stock_minimo && (
+              <small className="error-text">{errores.stock_minimo}</small>
+            )}
+          </div>
 
-          <input
-            type="date"
-            value={form.fecha_vencimiento}
-            onChange={(e) => setForm({ ...form, fecha_vencimiento: e.target.value })}
-          />
+          <div>
+            <input
+              type="date"
+              value={form.fecha_vencimiento}
+              onChange={(e) =>
+                setForm({ ...form, fecha_vencimiento: e.target.value })
+              }
+            />
+          </div>
 
           <div className="form-actions">
             <button type="submit" className="btn-primary">
@@ -180,7 +300,11 @@ export default function Productos() {
             </button>
 
             {editandoId && (
-              <button type="button" className="btn-secondary" onClick={limpiarForm}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={limpiarForm}
+              >
                 Cancelar
               </button>
             )}
@@ -214,10 +338,12 @@ export default function Productos() {
             <article className="data-row" key={p.id}>
               <div>
                 <h3>{p.nombre}</h3>
+
                 <p>
                   Código: {p.codigo_barra || "Sin código"} · Categoría:{" "}
                   {p.categoria || "Sin categoría"}
                 </p>
+
                 <p>
                   S/ {Number(p.precio).toFixed(2)} · Stock: {p.stock} · Vence:{" "}
                   {p.fecha_vencimiento
@@ -231,11 +357,17 @@ export default function Productos() {
                   + Stock
                 </button>
 
-                <button onClick={() => editarProducto(p)} className="btn-secondary">
+                <button
+                  onClick={() => editarProducto(p)}
+                  className="btn-secondary"
+                >
                   Editar
                 </button>
 
-                <button onClick={() => eliminarProducto(p.id)} className="btn-danger">
+                <button
+                  onClick={() => eliminarProducto(p.id)}
+                  className="btn-danger"
+                >
                   Eliminar
                 </button>
               </div>

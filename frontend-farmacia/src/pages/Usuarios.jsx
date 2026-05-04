@@ -12,6 +12,8 @@ export default function Usuarios() {
     rol: "vendedor"
   });
 
+  const [errores, setErrores] = useState({});
+
   const cargarUsuarios = async () => {
     const res = await api.get("/usuarios");
     setUsuarios(res.data);
@@ -29,21 +31,53 @@ export default function Usuarios() {
       rol: "vendedor"
     });
     setEditandoId(null);
+    setErrores({});
+  };
+
+  // 🔥 VALIDACIONES
+  const validar = () => {
+    const nuevosErrores = {};
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!form.nombre.trim()) {
+      nuevosErrores.nombre = "El nombre es obligatorio";
+    }
+
+    if (!form.email.trim()) {
+      nuevosErrores.email = "El correo es obligatorio";
+    } else if (!emailRegex.test(form.email)) {
+      nuevosErrores.email = "Correo inválido (ej: admin@nova.com)";
+    }
+
+    if (!editandoId && !form.password) {
+      nuevosErrores.password = "La contraseña es obligatoria";
+    } else if (form.password && form.password.length < 6) {
+      nuevosErrores.password = "Mínimo 6 caracteres";
+    }
+
+    setErrores(nuevosErrores);
+    return Object.keys(nuevosErrores).length === 0;
   };
 
   const guardarUsuario = async (e) => {
     e.preventDefault();
 
-    if (editandoId) {
-      await api.put(`/usuarios/${editandoId}`, form);
-      alert("Usuario actualizado");
-    } else {
-      await api.post("/auth/register", form);
-      alert("Usuario creado");
-    }
+    if (!validar()) return;
 
-    limpiarForm();
-    cargarUsuarios();
+    try {
+      if (editandoId) {
+        await api.put(`/usuarios/${editandoId}`, form);
+        alert("Usuario actualizado");
+      } else {
+        await api.post("/auth/register", form);
+        alert("Usuario creado");
+      }
+
+      limpiarForm();
+      cargarUsuarios();
+    } catch (error) {
+      alert(error.response?.data?.message || "Error");
+    }
   };
 
   const editarUsuario = (usuario) => {
@@ -54,6 +88,7 @@ export default function Usuarios() {
       password: "",
       rol: usuario.rol
     });
+    setErrores({});
   };
 
   const eliminarUsuario = async (id) => {
@@ -82,25 +117,49 @@ export default function Usuarios() {
         </div>
 
         <form className="user-form" onSubmit={guardarUsuario}>
-          <input
-            placeholder="Nombre"
-            value={form.nombre}
-            onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-          />
+          
+          {/* NOMBRE */}
+          <div>
+            <input
+              placeholder="Nombre"
+              value={form.nombre}
+              className={errores.nombre ? "input-error" : ""}
+              onChange={(e) =>
+                setForm({ ...form, nombre: e.target.value })
+              }
+            />
+            {errores.nombre && <small className="error-text">{errores.nombre}</small>}
+          </div>
 
-          <input
-            placeholder="Email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-          />
+          {/* EMAIL */}
+          <div>
+            <input
+              type="email"
+              placeholder="Email (ej: admin@nova.com)"
+              value={form.email}
+              className={errores.email ? "input-error" : ""}
+              onChange={(e) =>
+                setForm({ ...form, email: e.target.value })
+              }
+            />
+            {errores.email && <small className="error-text">{errores.email}</small>}
+          </div>
 
-          <input
-            type="password"
-            placeholder={editandoId ? "Nueva contraseña opcional" : "Contraseña"}
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-          />
+          {/* PASSWORD */}
+          <div>
+            <input
+              type="password"
+              placeholder={editandoId ? "Nueva contraseña opcional" : "Contraseña"}
+              value={form.password}
+              className={errores.password ? "input-error" : ""}
+              onChange={(e) =>
+                setForm({ ...form, password: e.target.value })
+              }
+            />
+            {errores.password && <small className="error-text">{errores.password}</small>}
+          </div>
 
+          {/* ROL */}
           <select
             value={form.rol}
             onChange={(e) => setForm({ ...form, rol: e.target.value })}

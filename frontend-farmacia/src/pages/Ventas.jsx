@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import api from "../services/api";
+import useProductos from "../hooks/useProductos";
 
 export default function Ventas() {
-  const [productos, setProductos] = useState([]);
+  const { productos, cargarProductos } = useProductos();
+
   const [busqueda, setBusqueda] = useState("");
   const [carrito, setCarrito] = useState([]);
 
@@ -12,14 +14,17 @@ export default function Ventas() {
   const [documento, setDocumento] = useState("");
 
   const [loading, setLoading] = useState(false);
+  const [errores, setErrores] = useState({});
 
-  useEffect(() => {
+  const limpiarVenta = () => {
+    setBusqueda("");
+    setCarrito([]);
+    setTipoComprobante("boleta");
+    setMetodoPago("efectivo");
+    setCliente("Cliente general");
+    setDocumento("");
+    setErrores({});
     cargarProductos();
-  }, []);
-
-  const cargarProductos = async () => {
-    const res = await api.get("/productos");
-    setProductos(res.data);
   };
 
   const buscar = async (texto) => {
@@ -31,13 +36,25 @@ export default function Ventas() {
     }
 
     const res = await api.get(`/productos/buscar?texto=${texto}`);
-    setProductos(res.data);
+    // como el hook expone setProductos, podrías extenderlo si quieres;
+    // para no tocar el hook, simplemente no sobreescribimos aquí.
+    // Alternativa rápida: no usar endpoint buscar y filtrar local.
   };
 
   const agregarProducto = (producto) => {
+    if (Number(producto.stock) <= 0) {
+      alert("Producto sin stock disponible");
+      return;
+    }
+
     const existe = carrito.find((p) => p.id === producto.id);
 
     if (existe) {
+      if (existe.cantidad + 1 > Number(producto.stock)) {
+        alert("No hay stock suficiente");
+        return;
+      }
+
       setCarrito(
         carrito.map((p) =>
           p.id === producto.id ? { ...p, cantidad: p.cantidad + 1 } : p
@@ -49,11 +66,20 @@ export default function Ventas() {
   };
 
   const cambiarCantidad = (id, cantidad) => {
-    if (cantidad <= 0) return;
+    const nuevaCantidad = Number(cantidad);
+
+    if (!nuevaCantidad || nuevaCantidad <= 0) return;
+
+    const producto = carrito.find((p) => p.id === id);
+
+    if (nuevaCantidad > Number(producto.stock)) {
+      alert("No hay stock suficiente");
+      return;
+    }
 
     setCarrito(
       carrito.map((p) =>
-        p.id === id ? { ...p, cantidad: Number(cantidad) } : p
+        p.id === id ? { ...p, cantidad: nuevaCantidad } : p
       )
     );
   };
@@ -62,13 +88,34 @@ export default function Ventas() {
     setCarrito(carrito.filter((p) => p.id !== id));
   };
 
+  const validarVenta = () => {
+    const nuevosErrores = {};
+
+    if (carrito.length === 0) {
+      nuevosErrores.carrito = "Agrega al menos un producto";
+    }
+
+    if (!cliente.trim()) {
+      nuevosErrores.cliente = "El nombre del cliente es obligatorio";
+    }
+
+    if (documento && documento.length !== 8) {
+      nuevosErrores.documento = "El DNI debe tener 8 dígitos";
+    }
+
+    const sinStock = carrito.find((p) => p.cantidad > Number(p.stock));
+    if (sinStock) {
+      nuevosErrores.carrito = `Stock insuficiente para ${sinStock.nombre}`;
+    }
+
+    setErrores(nuevosErrores);
+    return Object.keys(nuevosErrores).length === 0;
+  };
+
   const total = carrito.reduce((acc, p) => acc + p.precio * p.cantidad, 0);
 
   const registrarVenta = async () => {
-    if (carrito.length === 0) {
-      alert("Carrito vacío");
-      return;
-    }
+    if (!validarVenta()) return;
 
     try {
       setLoading(true);
@@ -86,16 +133,22 @@ export default function Ventas() {
         productos: productosVenta,
       });
 
-      alert("Venta realizada");
-
-      setCarrito([]);
-      cargarProductos();
+      alert("Venta realizada correctamente");
+      limpiarVenta();
     } catch (error) {
       alert(error.response?.data?.message || "Error en venta");
     } finally {
       setLoading(false);
     }
   };
+
+  const productosFiltrados = productos.filter((p) => {
+    const texto = busqueda.toLowerCase();
+    return (
+      String(p.nombre || "").toLowerCase().includes(texto) ||
+      String(p.codigo_barra || "").toLowerCase().includes(texto)
+    );
+  });
 
   return (
     <section className="page">
@@ -119,11 +172,11 @@ export default function Ventas() {
             className="search-input"
             placeholder="Buscar producto o código..."
             value={busqueda}
-            onChange={(e) => buscar(e.target.value)}
+            onChange={(e) => setBusqueda(e.target.value)}
           />
 
           <div className="product-list">
-            {productos.map((p) => (
+            {productosFiltrados.map((p) => (
               <article className="product-item" key={p.id}>
                 <div>
                   <h3>{p.nombre}</h3>
@@ -132,7 +185,11 @@ export default function Ventas() {
                   </p>
                 </div>
 
-                <button className="btn-add" onClick={() => agregarProducto(p)}>
+                <button
+                  className="btn-add"
+                  onClick={() => agregarProducto(p)}
+                  disabled={Number(p.stock) <= 0}
+                >
                   +
                 </button>
               </article>
@@ -163,6 +220,8 @@ export default function Ventas() {
                 <input
                   type="number"
                   value={p.cantidad}
+                  min="1"
+                  max={p.stock}
                   onChange={(e) => cambiarCantidad(p.id, e.target.value)}
                 />
 
@@ -175,6 +234,10 @@ export default function Ventas() {
               </article>
             ))}
           </div>
+
+          {errores.carrito && (
+            <small className="error-text">{errores.carrito}</small>
+          )}
 
           <div className="total-box">
             <span>Total a pagar</span>
@@ -200,17 +263,33 @@ export default function Ventas() {
               <option value="plin">Plin</option>
             </select>
 
-            <input
-              placeholder="Nombre cliente"
-              value={cliente}
-              onChange={(e) => setCliente(e.target.value)}
-            />
+            <div>
+              <input
+                placeholder="Nombre cliente"
+                value={cliente}
+                className={errores.cliente ? "input-error" : ""}
+                onChange={(e) => setCliente(e.target.value)}
+              />
+              {errores.cliente && (
+                <small className="error-text">{errores.cliente}</small>
+              )}
+            </div>
 
-            <input
-              placeholder="Documento"
-              value={documento}
-              onChange={(e) => setDocumento(e.target.value)}
-            />
+            <div>
+              <input
+                placeholder="Documento (DNI)"
+                value={documento}
+                maxLength={8}
+                className={errores.documento ? "input-error" : ""}
+                onChange={(e) => {
+                  const valor = e.target.value;
+                  if (/^\d*$/.test(valor)) setDocumento(valor);
+                }}
+              />
+              {errores.documento && (
+                <small className="error-text">{errores.documento}</small>
+              )}
+            </div>
           </div>
 
           <button

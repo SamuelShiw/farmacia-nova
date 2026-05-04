@@ -678,3 +678,15 @@
 .btn-success:hover {
   background: #bbf7d0;
 }
+
+.input-error {
+  border: 1px solid #dc2626 !important;
+  background: #fee2e2;
+}
+
+.error-text {
+  color: #dc2626;
+  font-size: 12px;
+  margin-top: 4px;
+  display: block;
+}
