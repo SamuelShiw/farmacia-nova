@@ -285,7 +285,7 @@ Ejemplo en PowerShell:
 Invoke-RestMethod -Uri "http://localhost:3001/api/ventas" `
 -Headers @{ "Authorization" = "Bearer TOKEN" }
 ```
-
+![alt text](image.png)
 ---
 
 ## ☁️ Base de datos en la nube
