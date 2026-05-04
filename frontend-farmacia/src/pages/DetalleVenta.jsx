@@ -5,11 +5,21 @@ import api from "../services/api";
 export default function DetalleVenta() {
   const { id } = useParams();
   const [detalle, setDetalle] = useState([]);
+  const [venta, setVenta] = useState(null);
+
+  const usuario = JSON.parse(localStorage.getItem("usuario"));
 
   useEffect(() => {
     api.get(`/ventas/${id}`)
       .then(res => setDetalle(res.data))
       .catch(() => alert("Error cargando detalle"));
+
+    api.get("/ventas")
+      .then(res => {
+        const encontrada = res.data.find(v => Number(v.id) === Number(id));
+        setVenta(encontrada);
+      })
+      .catch(() => console.log("No se pudo cargar datos generales"));
   }, [id]);
 
   const total = detalle.reduce((acc, item) => acc + Number(item.subtotal), 0);
@@ -19,7 +29,7 @@ export default function DetalleVenta() {
       <div className="page-header print-hidden">
         <div>
           <h1>Detalle de Venta #{id}</h1>
-          <p>Resumen de productos vendidos</p>
+          <p>Información completa del comprobante</p>
         </div>
       </div>
 
@@ -29,13 +39,24 @@ export default function DetalleVenta() {
           <p>Comprobante de venta #{id}</p>
         </div>
 
+        <div className="ticket-info">
+          <p><strong>Fecha:</strong> {venta?.fecha || venta?.created_at || "No registrada"}</p>
+          <p><strong>Cliente:</strong> {venta?.cliente_nombre || "Cliente general"}</p>
+          <p><strong>Documento:</strong> {venta?.cliente_documento || "Sin documento"}</p>
+          <p><strong>Comprobante:</strong> {venta?.tipo_comprobante || "No registrado"}</p>
+          <p><strong>Método de pago:</strong> {venta?.metodo_pago || "No registrado"}</p>
+          <p><strong>Usuario:</strong> {venta?.usuario_nombre || usuario?.nombre || "Usuario del sistema"}</p>
+          <p><strong>Rol:</strong> {venta?.usuario_rol || usuario?.rol || "No registrado"}</p>
+        </div>
+
         <div className="ticket-list">
           {detalle.map(item => (
             <article className="ticket-row" key={item.id}>
               <div>
                 <strong>{item.producto}</strong>
                 <p>
-                  Cantidad: {item.cantidad} · Precio: S/ {Number(item.precio_unitario).toFixed(2)}
+                  Cantidad: {item.cantidad} · Precio unitario: S/{" "}
+                  {Number(item.precio_unitario).toFixed(2)}
                 </p>
               </div>
 

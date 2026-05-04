@@ -690,3 +690,29 @@
   margin-top: 4px;
   display: block;
 }
+
+.ticket-info {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 18px;
+  padding: 16px;
+  margin-bottom: 18px;
+  border-radius: 16px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+}
+
+.ticket-info p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.ticket-info strong {
+  color: var(--primary);
+}
+
+@media (max-width: 560px) {
+  .ticket-info {
+    grid-template-columns: 1fr;
+  }
+}
